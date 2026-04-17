@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Administración de Productos</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <h1>Panel de Administración</h1>
+
+  <!-- Formulario para agregar producto -->
+  <form id="form-producto">
+    <input type="text" id="cat" placeholder="Categoría" required>
+    <input type="text" id="nombre" placeholder="Nombre del producto" required>
+    <input type="number" id="zelle" placeholder="Precio en Zelle" required>
+    <textarea id="nota" placeholder="Nota opcional sobre el producto"></textarea>
+    <p>Agrega la imagen del producto</p>
+    <input type="file" id="img" accept="image/*">
+    <label>
+      <input type="checkbox" id="activo" checked> Disponible en ofertas
+    </label>
+    <button type="submit">Agregar producto</button>
+  </form>
+
+  <hr>
+
+  <!-- Lista de productos existentes -->
+  <h2>Productos actuales</h2>
+  <div id="lista-productos"></div>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

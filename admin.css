@@ -1,0 +1,65 @@
+:root {
+    --color-texto: #7C5136;      /* El más oscuro */
+    --color-bordes: #A97F60;     /* El segundo */
+    --color-botones: #C8A88D;    /* El tercero */
+    --color-fondo-suave: #D7C6B3; /* El cuarto */
+    --color-detalles: #DED6CC;    /* El quinto (más claro) */
+    --blanco-crema: #F9F7F2;      /* Fondo general */
+}
+
+
+body {
+  font-family: "Adlery";
+  margin: 20px;
+  background-color: var(--blanco-crema);
+}
+
+h1,h2{
+
+text-align:center ;
+color: var(--color-texto);
+
+}
+
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+}
+
+p{
+  margin: 2px;
+  text-align: center;
+  color: var(--color-texto);
+}
+
+input, textarea, button {
+  padding: 8px;
+  border: 1px solid var(--color-bordes);
+  border-radius: 6px;
+}
+
+button {
+  background-color: var(--color-botones);
+  color: var(--color-texto);
+  cursor: pointer;
+  font-family: 'Adlery';
+  font-size: large;
+}
+
+button:hover {
+  background-color: var(--color-bordes);
+  color: var(--color-fondo-suave);
+}
+
+.producto-item {
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
