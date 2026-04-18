@@ -1,20 +1,27 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configura tu proyecto Supabase
-const supabaseUrl = "https://SorpresasNela.supabase.co";
+const supabaseUrl = "https://yibtjtlkaaphyikdsbvq.supabase.co";
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpYnRqdGxrYWFwaHlpa2RzYnZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE0MTUsImV4cCI6MjA5MjAyNzQxNX0.flnpvqOZNxS7uOny4TozRBveagv5j47rgnPhObKOKGU";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Manejo del formulario
 document.getElementById("form-producto").addEventListener("submit", async (e) => {
   e.preventDefault();
 
+  // Capturar archivo de imagen y convertirlo a Base64
+  const fileInput = document.getElementById("img");
+  let imgBase64 = null;
+  if (fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    imgBase64 = await toBase64(file);
+  }
+
   const producto = {
-    cat: document.getElementById("cat").value,
-    nombre: document.getElementById("nombre").value,
+    cat: document.getElementById("cat").value.trim(),
+    nombre: document.getElementById("nombre").value.trim(),
     zelle: parseFloat(document.getElementById("zelle").value),
-    nota: document.getElementById("nota").value,
-    img: document.getElementById("img").value,
+    nota: document.getElementById("nota").value.trim(),
+    img: imgBase64, // ahora sí guardamos la imagen
     activo: document.getElementById("activo").checked
   };
 
@@ -28,6 +35,16 @@ document.getElementById("form-producto").addEventListener("submit", async (e) =>
     e.target.reset();
   }
 });
+
+// Conversión a Base64
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+}
 
 // Función para cargar productos existentes
 async function cargarProductos() {
@@ -44,15 +61,17 @@ async function cargarProductos() {
     return;
   }
 
-  productos.forEach(p => {
-    const item = document.createElement("div");
-    item.className = "producto-item";
-    item.innerHTML = `
-      <span>${p.cat} - ${p.nombre} (${p.zelle} Zelle)</span>
-      <button onclick="ocultarProducto(${p.id})">${p.activo ? "Ocultar" : "Mostrar"}</button>
-    `;
-    lista.appendChild(item);
-  });
+ productos.forEach(p => {
+  const item = document.createElement("div");
+  item.className = "producto-item";
+  item.innerHTML = `
+    <span>${p.cat} - ${p.nombre} (${p.zelle} Zelle)</span>
+    <img src="${p.img}" alt="${p.nombre}" style="max-width:100px">
+    <button onclick="ocultarProducto(${p.id})">${p.activo ? "Ocultar" : "Mostrar"}</button>
+  `;
+  lista.appendChild(item);
+});
+
 }
 
 // Función para ocultar/mostrar producto
