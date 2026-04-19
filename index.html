@@ -7,19 +7,23 @@
 </head>
 <body>
   <h1>Panel de Administración</h1>
+  <button id="btn-agregar">Agregar producto</button>
+  <div id="categorias-container"></div>
+
+  
 
   <!-- Formulario para agregar producto -->
-  <form id="form-producto">
-    <input type="text" id="cat" placeholder="Categoría" required>
-    <input type="text" id="nombre" placeholder="Nombre del producto" required>
-    <input type="number" id="zelle" placeholder="Precio en Zelle" required>
-    <textarea id="nota" placeholder="Nota opcional sobre el producto"></textarea>
+  <form id="form-producto" style="display:none;">
+    <input type="text" style="margin: 8px;" id="cat" placeholder="Categoría" required>
+    <input type="text" style="margin: 8px;" id="nombre" placeholder="Nombre del producto" required>
+    <input type="number" style="margin: 8px;" id="zelle" placeholder="Precio en Zelle" required>
+    <textarea id="nota" style="margin: 8px;" placeholder="Nota opcional sobre el producto"></textarea>
     <p>Agrega la imagen del producto</p>
-    <input type="file" id="img" accept="image/*">
+    <input type="file" style="margin: 8px;" id="img" accept="image/*">
     <label>
-      <input type="checkbox" id="activo" checked> Disponible en ofertas
+      <input type="checkbox" style="margin: 8px;" id="activo" checked> Disponible en ofertas
     </label>
-    <button type="submit">Agregar producto</button>
+    <button type="submit">Aceptar</button>
   </form>
 
   <hr>

@@ -15,19 +15,28 @@ body {
 }
 
 h1,h2{
-
+  
 text-align:center ;
 color: var(--color-texto);
 
 }
 
+.btn-cat{
+  margin:10px;
+  display: table-row;
+}
 
-form {
-  display: flex;
+#btn-agregar{
+  justify-content: center;
+  background-color: #7C5136;
+  color: #DED6CC;
+}
+
+#form-producto {
   align-items: center;
-  flex-direction: column;
+  flex-direction: grid;
   gap: 10px;
-  margin: 20px;
+  margin-left: 190px;
   max-width: 400px;
 }
 
