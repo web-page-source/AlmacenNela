@@ -1,32 +1,112 @@
-// 1. Configura tu proyecto Supabase (SIN EL IMPORT DE ARRIBA)
-const supabaseUrl = "https://yibtjtlkaaphyikdsbvq.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpYnRqdGxrYWFwaHlpa2RzYnZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE0MTUsImV4cCI6MjA5MjAyNzQxNX0.flnpvqOZNxS7uOny4TozRBveagv5j47rgnPhObKOKGU";
+// Captura global de errores para avisar si algo falla en tiempo de ejecución
+window.onerror = function(msg, url, lineNo) {
+  alert(`Error JS Detectado: ${msg}\nLínea: ${lineNo}`);
+  return false;
+};
 
-// IMPORTANTE: Usamos 'supabase.createClient' porque la librería del CDN inyecta el objeto 'supabase'
-const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+window.onunhandledrejection = function(event) {
+  alert(`Error de Red / Promesa sin capturar: ${event.reason?.message || event.reason}`);
+};
 
-// Mostrar/ocultar formulario al presionar el botón
+// 1. Configuración e Inicialización de Supabase a través de config/env.js
+const supabaseUrl = window.ENV?.SUPABASE_URL;
+const supabaseKey = window.ENV?.SUPABASE_KEY;
+
+let _supabase = null;
+
+if (typeof supabase !== "undefined" && supabase.createClient && supabaseUrl && supabaseKey) {
+  _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+} else {
+  alert("No se encontraron las credenciales de Supabase. Revisa el archivo config/env.js");
+}
+
+// Variables globales
+let todosLosProductos = [];
+let filtroCategoriaActual = null;
+let tasaZelleCUP = 350;
+let idProductoAEliminar = null;
+
+// Alternar visibilidad del formulario "Agregar Producto"
 document.getElementById("btn-agregar").addEventListener("click", () => {
   const formContainer = document.getElementById("form-producto");
-  if (formContainer.style.display === "none") {
-    formContainer.style.display = "block";
-  } else {
-    formContainer.style.display = "none";
-  }
+  formContainer.style.display = (formContainer.style.display === "none" || formContainer.style.display === "") ? "block" : "none";
 });
 
+// --- LÓGICA DEL MODAL "ACTUALIZAR PRECIO DEL ZELLE" ---
 
+document.getElementById("btn-zelle").addEventListener("click", async () => {
+  await cargarTasaZelle();
+  document.getElementById("tasa-zelle-input").value = tasaZelleCUP;
+  document.getElementById("modal-zelle").style.display = "flex";
+});
+
+window.cerrarModalZelle = function() {
+  document.getElementById("modal-zelle").style.display = "none";
+};
+
+async function cargarTasaZelle() {
+  if (!_supabase) return;
+  try {
+    const { data, error } = await _supabase
+      .from("configuracion")
+      .select("valor")
+      .eq("clave", "tasa_zelle")
+      .maybeSingle();
+
+    if (data && data.valor !== undefined) {
+      tasaZelleCUP = parseFloat(data.valor);
+      localStorage.setItem("tasa_zelle", tasaZelleCUP);
+    } else {
+      const localValue = localStorage.getItem("tasa_zelle");
+      if (localValue) tasaZelleCUP = parseFloat(localValue);
+    }
+  } catch (err) {
+    const localValue = localStorage.getItem("tasa_zelle");
+    if (localValue) tasaZelleCUP = parseFloat(localValue);
+  }
+}
+
+document.getElementById("form-tasa-zelle").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const nuevaTasa = parseFloat(document.getElementById("tasa-zelle-input").value);
+
+  if (isNaN(nuevaTasa) || nuevaTasa <= 0) {
+    alert("Por favor ingrese un número válido.");
+    return;
+  }
+
+  tasaZelleCUP = nuevaTasa;
+  localStorage.setItem("tasa_zelle", nuevaTasa);
+
+  if (_supabase) {
+    const { error } = await _supabase
+      .from("configuracion")
+      .upsert({ clave: "tasa_zelle", valor: nuevaTasa }, { onConflict: "clave" });
+
+    if (error) {
+      alert(`Tasa guardada localmente (${nuevaTasa} CUP).\nNota de Supabase: ${error.message}`);
+    } else {
+      alert(`Tasa Zelle actualizada correctamente: 1 Zelle = ${nuevaTasa} CUP`);
+    }
+  }
+
+  cerrarModalZelle();
+});
+
+// --- LÓGICA DE PRODUCTOS ---
+
+// Agregar nuevo producto
 document.getElementById("form-producto").addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const fileInput = document.getElementById("img");
   let imgBase64 = null;
   if (fileInput.files.length > 0) {
-    const file = fileInput.files[0];
-    imgBase64 = await toBase64(file);
+    imgBase64 = await toBase64(fileInput.files[0]);
   }
 
-  const producto = {
+  const nuevoProducto = {
     cat: document.getElementById("cat").value.trim(),
     nombre: document.getElementById("nombre").value.trim(),
     zelle: parseFloat(document.getElementById("zelle").value),
@@ -35,16 +115,19 @@ document.getElementById("form-producto").addEventListener("submit", async (e) =>
     activo: document.getElementById("activo").checked
   };
 
-  // Usamos _supabase para evitar conflictos
-  const { error } = await _supabase.from("productos").insert([producto]);
+  try {
+    const { error } = await _supabase.from("productos").insert([nuevoProducto]);
 
-  if (error) {
-    alert("Error al guardar: " + error.message);
-  } else {
-    alert("Producto agregado correctamente");
-    cargarProductos();
-    mostrarCategorias();
-    e.target.reset();
+    if (error) {
+      alert("Error al guardar en Supabase: " + error.message);
+    } else {
+      alert("Producto agregado correctamente");
+      document.getElementById("form-producto").reset();
+      document.getElementById("form-producto").style.display = "none";
+      cargarProductos(filtroCategoriaActual);
+    }
+  } catch (err) {
+    alert("Error de red al agregar producto: " + err.message);
   }
 });
 
@@ -56,97 +139,211 @@ function toBase64(file) {
     reader.onerror = error => reject(error);
   });
 }
+
+// Cargar productos desde Supabase
 async function cargarProductos(filtroCat = null) {
+  filtroCategoriaActual = filtroCat;
+  const lista = document.getElementById("lista-productos");
+  lista.innerHTML = "<p style='text-align:center; grid-column: 1/-1;'>Cargando catálogo...</p>";
+
+  if (!_supabase) {
+    lista.innerHTML = "<p style='text-align:center; color:red; grid-column: 1/-1;'>Error: Supabase no está disponible.</p>";
+    return;
+  }
+
+  try {
+    const { data: productos, error } = await _supabase
+      .from("productos")
+      .select("*")
+      .order("id", { ascending: true });
+
+    if (error) {
+      lista.innerHTML = `<p style='text-align:center; color:red; grid-column: 1/-1;'>Error al cargar productos: ${error.message}</p>`;
+      return;
+    }
+
+    todosLosProductos = productos || [];
+    renderizarProductos();
+    mostrarCategorias();
+  } catch (err) {
+    lista.innerHTML = `<p style='text-align:center; color:red; grid-column: 1/-1;'>Error de conexión: ${err.message}</p>`;
+  }
+}
+
+// Renderizar las tarjetas de producto
+function renderizarProductos() {
   const lista = document.getElementById("lista-productos");
   lista.innerHTML = "";
 
-  // Traer TODOS los productos, sin filtrar por activo
-  const { data: productos, error } = await _supabase
-    .from("productos")
-    .select("*")
-    .order("id", { ascending: true });
+  let productosFiltrados = filtroCategoriaActual 
+    ? todosLosProductos.filter(p => p.cat === filtroCategoriaActual) 
+    : todosLosProductos;
 
-  if (error) {
-    lista.innerHTML = "<p>Error al cargar productos</p>";
+  const ordenPrioridad = ["La Sorpresa", "Decoración"];
+  productosFiltrados.sort((a, b) => {
+    const catA = String(a.cat || "");
+    const catB = String(b.cat || "");
+    const idxA = ordenPrioridad.indexOf(catA);
+    const idxB = ordenPrioridad.indexOf(catB);
+
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB || String(a.id).localeCompare(String(b.id));
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    if (catA === "Extras") return 1;
+    if (catB === "Extras") return -1;
+
+    const catCompare = catA.localeCompare(catB);
+    return catCompare !== 0 ? catCompare : String(a.id).localeCompare(String(b.id));
+  });
+
+  if (productosFiltrados.length === 0) {
+    lista.innerHTML = "<p style='text-align:center; grid-column: 1/-1;'>No hay productos en esta categoría.</p>";
     return;
   }
 
-  // Filtrar si se seleccionó una categoría
-  let productosFiltrados = filtroCat ? productos.filter(p => p.cat === filtroCat) : productos;
-
-  // Ordenar productos según reglas de categoría y luego por id
-  const ordenPrioridad = ["La Sorpresa", "Decoración"];
-  productosFiltrados.sort((a, b) => {
-    const idxA = ordenPrioridad.indexOf(a.cat);
-    const idxB = ordenPrioridad.indexOf(b.cat);
-
-    if (idxA !== -1 && idxB !== -1) return idxA - idxB || a.id - b.id;
-    if (idxA !== -1) return -1;
-    if (idxB !== -1) return 1;
-    if (a.cat === "Extras") return 1;
-    if (b.cat === "Extras") return -1;
-
-    const catCompare = a.cat.localeCompare(b.cat);
-    return catCompare !== 0 ? catCompare : a.id - b.id;
-  });
-
-  // Renderizar productos
   productosFiltrados.forEach(p => {
-    const item = document.createElement("div");
-    item.className = "producto-item";
-    item.innerHTML = `
-      <span>${p.cat} - ${p.nombre} (${p.zelle} Zelle)</span>
-      ${p.img ? `<img src="${p.img}" alt="${p.nombre}" style="max-width:100px; display:block;">` : ''}
-      <button onclick="ocultarProducto(${p.id}, ${p.activo ? 'true' : 'false'})">
-        ${p.activo ? "Ocultar" : "Mostrar"}
-      </button>
-    `;
-    lista.appendChild(item);
-  });
+    const card = document.createElement("div");
+    card.className = `producto-card ${!p.activo ? 'oculto' : ''}`;
+    
+    const imagenHTML = p.img 
+      ? `<img src="${p.img}" alt="${p.nombre}" class="producto-img">`
+      : `<div class="producto-img-placeholder">Sin Imagen</div>`;
 
-  // Actualizar categorías
-  mostrarCategorias();
+    card.innerHTML = `
+      ${imagenHTML}
+      <div class="producto-info">
+        <div>
+          <span class="producto-cat-badge">${p.cat || 'Sin Categoría'}</span>
+          <h3 class="producto-titulo">${p.nombre}</h3>
+          <div class="producto-precio">$${p.zelle} Zelle</div>
+          ${p.nota ? `<p class="producto-nota">"${p.nota}"</p>` : ''}
+        </div>
+        
+        <div class="producto-acciones">
+          <button type="button" class="btn-accion btn-editar" data-id="${p.id}">✎ Editar</button>
+          <button type="button" class="btn-accion btn-estado" data-id="${p.id}">
+            ${p.activo ? "Ocultar" : "Mostrar"}
+          </button>
+          <button type="button" class="btn-accion btn-eliminar" data-id="${p.id}">Eliminar</button>
+        </div>
+      </div>
+    `;
+
+    lista.appendChild(card);
+  });
 }
 
-// Función para ocultar/mostrar producto
-window.ocultarProducto = async function(id, estadoActual) {
-  const nuevoEstado = !estadoActual;
+// CAPTURA CENTRALIZADA DE CLICS EN LOS BOTONES DE LAS TARJETAS
+document.getElementById("lista-productos").addEventListener("click", (e) => {
+  const btnEliminar = e.target.closest(".btn-eliminar");
+  if (btnEliminar) {
+    const id = btnEliminar.getAttribute("data-id");
+    abrirModalEliminar(id);
+    return;
+  }
 
-  const { error } = await _supabase
-    .from("productos")
-    .update({ activo: nuevoEstado })
-    .eq("id", id);
+  const btnEditar = e.target.closest(".btn-editar");
+  if (btnEditar) {
+    const id = btnEditar.getAttribute("data-id");
+    abrirModalEditar(id);
+    return;
+  }
 
-  if (error) {
-    alert("Error al actualizar: " + error.message);
-  } else {
-    cargarProductos(); // refresca lista con nuevo estado
-    mostrarCategorias();
+  const btnEstado = e.target.closest(".btn-estado");
+  if (btnEstado) {
+    const id = btnEstado.getAttribute("data-id");
+    ocultarProducto(id);
+    return;
+  }
+});
+
+// Ocultar / Mostrar producto
+window.ocultarProducto = async function(id) {
+  const prod = todosLosProductos.find(p => String(p.id) === String(id));
+  if (!prod) return;
+
+  const nuevoEstado = !prod.activo;
+
+  try {
+    const { error } = await _supabase
+      .from("productos")
+      .update({ activo: nuevoEstado })
+      .eq("id", id);
+
+    if (error) {
+      alert("Error al actualizar estado: " + error.message);
+    } else {
+      prod.activo = nuevoEstado;
+      renderizarProductos();
+    }
+  } catch (err) {
+    alert("Error de red al actualizar estado: " + err.message);
   }
 };
 
-async function mostrarCategorias() {
-  const contenedor = document.getElementById("categorias-container");
+// --- LÓGICA DE ELIMINACIÓN CON MODAL PROPIO ---
 
-  // Traer todas las categorías (sin filtrar por activo)
-  const { data: productos, error } = await _supabase
-    .from("productos")
-    .select("cat");
-
-  if (error) {
-    contenedor.innerHTML = "<p>Error al cargar categorías</p>";
+window.abrirModalEliminar = function(id) {
+  const producto = todosLosProductos.find(p => String(p.id) === String(id));
+  if (!producto) {
+    alert("No se encontró el producto en la lista local.");
     return;
   }
 
-  // Extraer categorías únicas
-  let categoriasUnicas = [...new Set(productos.map(p => p.cat))];
+  idProductoAEliminar = id;
+  document.getElementById("texto-confirmar-eliminar").innerHTML = 
+    `¿Estás seguro de eliminar permanentemente el producto:<br><strong style="color:#4A3222; font-size:1.1rem;">"${producto.nombre}"</strong>?<br><br><small style="color:#7C5136;">Esta acción no se puede deshacer.</small>`;
+  
+  document.getElementById("modal-eliminar").style.display = "flex";
+};
 
-  // Ordenar categorías según reglas
+window.cerrarModalEliminar = function() {
+  document.getElementById("modal-eliminar").style.display = "none";
+  idProductoAEliminar = null;
+};
+
+document.getElementById("btn-confirmar-eliminar-action").addEventListener("click", async () => {
+  if (!idProductoAEliminar) return;
+
+  const btnConfirmar = document.getElementById("btn-confirmar-eliminar-action");
+  btnConfirmar.innerText = "Eliminando...";
+  btnConfirmar.disabled = true;
+
+  try {
+    // Si la ID en BD es número se envía numérica, de lo contrario String
+    const idTarget = isNaN(idProductoAEliminar) ? idProductoAEliminar : Number(idProductoAEliminar);
+
+    const { error } = await _supabase
+      .from("productos")
+      .delete()
+      .eq("id", idTarget);
+
+    if (error) {
+      alert(`Error al eliminar de Supabase:\n${error.message}\n\n⚠️ Si el error dice 'permission denied', debes revisar los permisos RLS en Supabase.`);
+    } else {
+      alert("Producto eliminado exitosamente de la base de datos.");
+      todosLosProductos = todosLosProductos.filter(p => String(p.id) !== String(idProductoAEliminar));
+      renderizarProductos();
+      mostrarCategorias();
+    }
+  } catch (err) {
+    alert("Error de conexión al eliminar: " + err.message);
+  } finally {
+    btnConfirmar.innerText = "Sí, Eliminar";
+    btnConfirmar.disabled = false;
+    cerrarModalEliminar();
+  }
+});
+
+function mostrarCategorias() {
+  const contenedor = document.getElementById("categorias-container");
+
+  let categoriasUnicas = [...new Set(todosLosProductos.map(p => p.cat).filter(Boolean))];
+
   const ordenPrioridad = ["La Sorpresa", "Decoración"];
   categoriasUnicas.sort((a, b) => {
     const idxA = ordenPrioridad.indexOf(a);
     const idxB = ordenPrioridad.indexOf(b);
-
     if (idxA !== -1 && idxB !== -1) return idxA - idxB;
     if (idxA !== -1) return -1;
     if (idxB !== -1) return 1;
@@ -155,19 +352,119 @@ async function mostrarCategorias() {
     return a.localeCompare(b);
   });
 
-  // Construir botones
-  let html = `<label style="display:block; margin-top:10px; font-weight:bold;text-align:center">Categorías existentes:</label>`;
+  let html = `<label style="display:block; font-weight:bold; text-align:center;">Filtrar por Categoría:</label>`;
+  html += `<div class="btn-cat-wrapper">`;
   
-  // Botón "Todas"
-  html += `<button class="btn-cat" onclick="cargarProductos()">Todas</button> `;
+  const activeTodas = filtroCategoriaActual === null ? 'active-cat' : '';
+  html += `<button type="button" class="btn-cat ${activeTodas}" onclick="filtrarCat(null)">Todas</button>`;
 
-  // Botones de categorías
   categoriasUnicas.forEach(cat => {
-    html += `<button class="btn-cat" onclick="cargarProductos('${cat}')">${cat}</button> `;
+    const active = filtroCategoriaActual === cat ? 'active-cat' : '';
+    html += `<button type="button" class="btn-cat ${active}" onclick="filtrarCat('${cat}')">${cat}</button>`;
   });
 
+  html += `</div>`;
   contenedor.innerHTML = html;
 }
 
-// Ejecutar al cargar
+window.filtrarCat = function(cat) {
+  filtroCategoriaActual = cat;
+  mostrarCategorias();
+  renderizarProductos();
+};
+
+// --- MODAL Y LÓGICA DE EDICIÓN ---
+
+window.abrirModalEditar = function(id) {
+  const producto = todosLosProductos.find(p => String(p.id) === String(id));
+  if (!producto) {
+    alert("No se encontró el producto para editar.");
+    return;
+  }
+
+  document.getElementById("edit-id").value = producto.id;
+  document.getElementById("edit-cat").value = producto.cat || "";
+  document.getElementById("edit-nombre").value = producto.nombre || "";
+  document.getElementById("edit-zelle").value = producto.zelle || 0;
+  document.getElementById("edit-nota").value = producto.nota || "";
+  document.getElementById("edit-activo").checked = !!producto.activo;
+
+  const preview = document.getElementById("edit-img-preview");
+  if (producto.img) {
+    preview.src = producto.img;
+    preview.style.display = "block";
+  } else {
+    preview.style.display = "none";
+  }
+
+  document.getElementById("edit-img-file").value = "";
+  document.getElementById("modal-editar").style.display = "flex";
+};
+
+window.cerrarModalEditar = function() {
+  document.getElementById("modal-editar").style.display = "none";
+};
+
+// Guardar cambios del producto
+document.getElementById("form-editar-producto").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const id = document.getElementById("edit-id").value;
+  const cat = document.getElementById("edit-cat").value.trim();
+  const nombre = document.getElementById("edit-nombre").value.trim();
+  const zelle = parseFloat(document.getElementById("edit-zelle").value);
+  const nota = document.getElementById("edit-nota").value.trim();
+  const activo = document.getElementById("edit-activo").checked;
+
+  const fileInput = document.getElementById("edit-img-file");
+  
+  const datosActualizados = {
+    cat,
+    nombre,
+    zelle,
+    nota,
+    activo
+  };
+
+  if (fileInput.files.length > 0) {
+    datosActualizados.img = await toBase64(fileInput.files[0]);
+  }
+
+  try {
+    const idTarget = isNaN(id) ? id : Number(id);
+
+    const { error } = await _supabase
+      .from("productos")
+      .update(datosActualizados)
+      .eq("id", idTarget);
+
+    if (error) {
+      alert("Error al actualizar el producto: " + error.message);
+    } else {
+      const index = todosLosProductos.findIndex(p => String(p.id) === String(id));
+      if (index !== -1) {
+        todosLosProductos[index] = { ...todosLosProductos[index], ...datosActualizados };
+      }
+
+      alert("Producto actualizado con éxito");
+      cerrarModalEditar();
+      renderizarProductos();
+      mostrarCategorias();
+    }
+  } catch (err) {
+    alert("Error de red al editar: " + err.message);
+  }
+});
+
+document.getElementById("edit-img-file").addEventListener("change", async (e) => {
+  if (e.target.files.length > 0) {
+    const base64 = await toBase64(e.target.files[0]);
+    const preview = document.getElementById("edit-img-preview");
+    preview.src = base64;
+    preview.style.display = "block";
+  }
+});
+
+// Carga Inicial
+cargarTasaZelle();
 cargarProductos();

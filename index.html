@@ -2,38 +2,159 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Administración de Productos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Administración | Sorpresas Nela</title>
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
-  <h1>Panel de Administración</h1>
-  <button id="btn-agregar">Agregar producto</button>
-  <div id="categorias-container"></div>
 
+  <!-- Fondo animado de nubes -->
+  <div class="clouds-bg">
+    <div class="cloud cloud-1"></div>
+    <div class="cloud cloud-2"></div>
+  </div>
+
+  <div class="admin-container">
+    <h1>Panel de Administración</h1>
+
+    <!-- Botones Principales de Acción -->
+    <div class="btn-top-bar">
+      <button id="btn-agregar" type="button">Agregar Nuevo Producto</button>
+      <button id="btn-zelle" type="button" class="btn-zelle">Zelle</button>
+    </div>
+
+    <!-- Formulario para Agregar Producto -->
+    <form id="form-producto" class="form-card" style="display:none;">
+      <h3>Nuevo Producto</h3>
+      
+      <div class="form-group">
+        <label for="cat">Categoría</label>
+        <input type="text" id="cat" placeholder="Ej: La Sorpresa, Decoración, Extras" required>
+      </div>
+
+      <div class="form-group">
+        <label for="nombre">Nombre del producto</label>
+        <input type="text" id="nombre" placeholder="Nombre descriptivo" required>
+      </div>
+
+      <div class="form-group">
+        <label for="zelle">Precio en Zelle ($)</label>
+        <input type="number" step="0.01" id="zelle" placeholder="0.00" required>
+      </div>
+
+      <div class="form-group">
+        <label for="nota">Nota opcional</label>
+        <textarea id="nota" placeholder="Detalles o descripción breve..." rows="3"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Foto del producto</label>
+        <div class="file-input-wrapper">
+          <input type="file" id="img" accept="image/*">
+        </div>
+      </div>
+
+      <label class="checkbox-label">
+        <input type="checkbox" id="activo" checked>
+        Disponible en el catálogo
+      </label>
+
+      <button type="submit" style="width:100%; margin-top:10px;">Guardar Producto</button>
+    </form>
+
+    <!-- Contenedor de Filtros por Categoría -->
+    <div id="categorias-container"></div>
+
+    <!-- Sección de Productos Existentes -->
+    <h2>Catálogo Actual</h2>
+    <div id="lista-productos"></div>
+  </div>
+
+  <!-- MODAL PARA EDITAR PRODUCTO -->
+  <div id="modal-editar" class="modal-overlay">
+    <div class="modal-content">
+      <h3>Editar Producto</h3>
+      
+      <form id="form-editar-producto">
+        <input type="hidden" id="edit-id">
+
+        <div class="form-group">
+          <label for="edit-cat">Categoría</label>
+          <input type="text" id="edit-cat" required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-nombre">Nombre del producto</label>
+          <input type="text" id="edit-nombre" required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-zelle">Precio en Zelle ($)</label>
+          <input type="number" step="0.01" id="edit-zelle" required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-nota">Nota opcional</label>
+          <textarea id="edit-nota" rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Cambiar / Subir Foto</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="edit-img-file" accept="image/*">
+          </div>
+          <img id="edit-img-preview" class="preview-img-edit" alt="Vista previa" style="display:none;">
+        </div>
+
+        <label class="checkbox-label">
+          <input type="checkbox" id="edit-activo">
+          Disponible en oferta
+        </label>
+
+        <div class="modal-acciones">
+          <button type="button" class="btn-cancelar" onclick="cerrarModalEditar()" style="flex:1;">Cancelar</button>
+          <button type="submit" style="flex:1;">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIRMACIÓN PARA ELIMINAR -->
+  <div id="modal-eliminar" class="modal-overlay">
+    <div class="modal-content" style="text-align: center;">
+      <h3 style="color: #C0392B;">🗑️ Eliminar Producto</h3>
+      <p id="texto-confirmar-eliminar" style="margin: 18px 0; font-size: 0.95rem; line-height: 1.4;">
+        ¿Estás seguro de que deseas eliminar este producto?
+      </p>
+      <div class="modal-acciones">
+        <button type="button" class="btn-cancelar" onclick="cerrarModalEliminar()" style="flex:1;">Cancelar</button>
+        <button type="button" id="btn-confirmar-eliminar-action" style="flex:1; background-color: #C0392B !important;">Sí, Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARA ACTUALIZAR PRECIO DEL ZELLE (TASA A CUP) -->
+  <div id="modal-zelle" class="modal-overlay">
+    <div class="modal-content">
+      <h3>Actualizar precio del zelle</h3>
+      <p style="margin-bottom: 15px; font-size: 0.9rem;">Define el valor en Pesos Cubanos (CUP) equivalente a 1 USD en Zelle.</p>
+
+      <form id="form-tasa-zelle">
+        <div class="form-group">
+          <label for="tasa-zelle-input">1 Zelle = ? CUP</label>
+          <input type="number" step="1" id="tasa-zelle-input" placeholder="Ej: 350" required>
+        </div>
+
+        <div class="modal-acciones">
+          <button type="button" class="btn-cancelar" onclick="cerrarModalZelle()" style="flex:1;">Cancelar</button>
+          <button type="submit" style="flex:1;">Actualizar Tasa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="config/env.js"></script>
   
-
-  <!-- Formulario para agregar producto -->
-  <form id="form-producto" style="display:none;">
-    <input type="text" style="margin: 8px;" id="cat" placeholder="Categoría" required>
-    <input type="text" style="margin: 8px;" id="nombre" placeholder="Nombre del producto" required>
-    <input type="number" style="margin: 8px;" id="zelle" placeholder="Precio en Zelle" required>
-    <textarea id="nota" style="margin: 8px;" placeholder="Nota opcional sobre el producto"></textarea>
-    <p>Agrega la imagen del producto</p>
-    <input type="file" style="margin: 8px;" id="img" accept="image/*">
-    <label>
-      <input type="checkbox" style="margin: 8px;" id="activo" checked> Disponible en ofertas
-    </label>
-    <button type="submit">Aceptar</button>
-  </form>
-
-  <hr>
-
-  <!-- Lista de productos existentes -->
-  <h2>Productos actuales</h2>
-  <div id="lista-productos"></div>
-
-  
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="admin.js"></script>
+  <!-- Carga UMD de Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script> <script src="admin.js"></script>
 </body>
 </html>
