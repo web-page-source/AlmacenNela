@@ -17,8 +17,12 @@
   <div class="admin-container">
     <h1>Panel de Administración</h1>
 
+    <!-- ============ VISTA: PRODUCTOS ============ -->
+    <div id="vista-productos">
+
     <!-- Botones Principales de Acción -->
     <div class="btn-top-bar">
+      <button id="btn-equipo" type="button" class="btn-equipo">Equipo</button>
       <button id="btn-agregar" type="button">Agregar Nuevo Producto</button>
       <button id="btn-zelle" type="button" class="btn-zelle">Zelle</button>
     </div>
@@ -68,6 +72,44 @@
     <!-- Sección de Productos Existentes -->
     <h2>Catálogo Actual</h2>
     <div id="lista-productos"></div>
+    </div>
+    <!-- ============ /VISTA: PRODUCTOS ============ -->
+
+    <!-- ============ VISTA: EQUIPO ============ -->
+    <div id="vista-equipo" style="display:none;">
+      <div class="btn-top-bar">
+        <button id="btn-volver-catalogo" type="button" class="btn-equipo">← Catálogo</button>
+        <button id="btn-agregar-miembro" type="button">Agregar Miembro</button>
+      </div>
+
+      <!-- Formulario para Agregar Miembro -->
+      <form id="form-miembro" class="form-card" style="display:none;">
+        <h3>Nuevo Miembro</h3>
+
+        <div class="form-group">
+          <label for="m-nombre">Nombre</label>
+          <input type="text" id="m-nombre" placeholder="Nombre y apellidos" required>
+        </div>
+
+        <div class="form-group">
+          <label for="m-funcion">Función</label>
+          <input type="text" id="m-funcion" placeholder="Ej: Decoradora, Cantante, Animadora" required>
+        </div>
+
+        <div class="form-group">
+          <label>Foto</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="m-foto" accept="image/*">
+          </div>
+        </div>
+
+        <button type="submit" style="width:100%; margin-top:10px;">Guardar Miembro</button>
+      </form>
+
+      <h2>Nuestro Equipo</h2>
+      <div id="lista-equipo"></div>
+    </div>
+    <!-- ============ /VISTA: EQUIPO ============ -->
   </div>
 
   <!-- MODAL PARA EDITAR PRODUCTO -->
@@ -152,6 +194,54 @@
       </form>
     </div>
   </div>
+  <!-- MODAL PARA EDITAR MIEMBRO DEL EQUIPO -->
+  <div id="modal-editar-miembro" class="modal-overlay">
+    <div class="modal-content">
+      <h3>Editar Miembro</h3>
+
+      <form id="form-editar-miembro">
+        <input type="hidden" id="edit-m-id">
+
+        <div class="form-group">
+          <label for="edit-m-nombre">Nombre</label>
+          <input type="text" id="edit-m-nombre" required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-m-funcion">Función</label>
+          <input type="text" id="edit-m-funcion" required>
+        </div>
+
+        <div class="form-group">
+          <label>Cambiar / Subir Foto</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="edit-m-foto-file" accept="image/*">
+          </div>
+          <img id="edit-m-foto-preview" class="preview-img-edit" alt="Vista previa" style="display:none;">
+        </div>
+
+        <div class="modal-acciones">
+          <button type="button" class="btn-cancelar" onclick="cerrarModalEditarMiembro()" style="flex:1;">Cancelar</button>
+          <button type="submit" style="flex:1;">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIRMACIÓN PARA ELIMINAR MIEMBRO -->
+  <div id="modal-eliminar-miembro" class="modal-overlay">
+    <div class="modal-content" style="text-align: center;">
+      <h3 style="color: #C0392B;">🗑️ Eliminar Miembro</h3>
+      <p id="texto-confirmar-eliminar-miembro" style="margin: 18px 0; font-size: 0.95rem; line-height: 1.4;">
+        ¿Estás seguro de que deseas eliminar a este miembro?
+      </p>
+      <div class="modal-acciones">
+        <button type="button" class="btn-cancelar" onclick="cerrarModalEliminarMiembro()" style="flex:1;">Cancelar</button>
+        <button type="button" id="btn-confirmar-eliminar-miembro" style="flex:1; background-color: #C0392B !important;">Sí, Eliminar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="config/env.js"></script>
   
   <!-- Carga UMD de Supabase JS v2 -->

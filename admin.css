@@ -246,7 +246,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* --- TARJETAS DE PRODUCTOS EN ADMIN --- */
-#lista-productos {
+#lista-productos, #lista-equipo {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 20px;
@@ -406,7 +406,7 @@ input:focus, textarea:focus, select:focus {
 
 /* RESPONSIVO */
 @media (max-width: 600px) {
-    #lista-productos {
+    #lista-productos, #lista-equipo {
         grid-template-columns: 1fr;
     }
     body {
@@ -473,4 +473,15 @@ input:focus, textarea:focus, select:focus {
 .btn-eliminar:hover {
     background-color: #A93226 !important;
     box-shadow: 0 6px 16px rgba(169, 50, 38, 0.45), 0 6px 14px rgba(255, 255, 255, 0.8) !important;
+}
+
+/* --- BOTÓN EQUIPO / VOLVER --- */
+.btn-equipo {
+    background-color: var(--color-btn-secundario) !important;
+    box-shadow: 0 6px 18px rgba(140, 98, 74, 0.4), 0 6px 16px rgba(255, 255, 255, 0.7) !important;
+}
+
+.btn-equipo:hover {
+    background-color: #704B37 !important;
+    box-shadow: 0 8px 22px rgba(112, 75, 55, 0.5), 0 8px 20px rgba(255, 255, 255, 0.85) !important;
 }

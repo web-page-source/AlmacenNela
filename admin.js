@@ -468,3 +468,322 @@ document.getElementById("edit-img-file").addEventListener("change", async (e) =>
 // Carga Inicial
 cargarTasaZelle();
 cargarProductos();
+
+
+// =====================================================
+// ================  SECCIÓN: EQUIPO  ==================
+// =====================================================
+
+let todoElEquipo = [];
+let idMiembroAEliminar = null;
+
+function escaparHTML(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+// Cambiar entre la pantalla de productos y la de equipo
+function mostrarVista(vista) {
+  document.getElementById("vista-productos").style.display = (vista === "productos") ? "block" : "none";
+  document.getElementById("vista-equipo").style.display = (vista === "equipo") ? "block" : "none";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+document.getElementById("btn-equipo").addEventListener("click", () => {
+  mostrarVista("equipo");
+  cargarEquipo();
+});
+
+document.getElementById("btn-volver-catalogo").addEventListener("click", () => {
+  mostrarVista("productos");
+});
+
+// Alternar visibilidad del formulario "Agregar Miembro"
+document.getElementById("btn-agregar-miembro").addEventListener("click", () => {
+  const form = document.getElementById("form-miembro");
+  form.style.display = (form.style.display === "none" || form.style.display === "") ? "block" : "none";
+});
+
+// Convierte cualquier imagen a una foto ligera (máx. 900px) en base64.
+// Si el navegador no puede leer el formato, guarda el archivo original tal cual.
+async function fotoABase64(file, maxLado = 900, calidad = 0.85) {
+  try {
+    const url = URL.createObjectURL(file);
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = url;
+    });
+    URL.revokeObjectURL(url);
+
+    const escala = Math.min(1, maxLado / Math.max(img.width, img.height));
+    const w = Math.round(img.width * escala);
+    const h = Math.round(img.height * escala);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#FFFFFF"; // fondo blanco para imágenes con transparencia (PNG, WebP...)
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", calidad);
+  } catch (err) {
+    return toBase64(file);
+  }
+}
+
+// Cargar equipo desde Supabase
+async function cargarEquipo() {
+  const lista = document.getElementById("lista-equipo");
+  lista.innerHTML = "<p style='text-align:center; grid-column: 1/-1;'>Cargando equipo...</p>";
+
+  if (!_supabase) {
+    lista.innerHTML = "<p style='text-align:center; color:red; grid-column: 1/-1;'>Error: Supabase no está disponible.</p>";
+    return;
+  }
+
+  try {
+    const { data, error } = await _supabase
+      .from("equipo")
+      .select("*")
+      .order("id", { ascending: true });
+
+    if (error) {
+      lista.innerHTML = `<p style='text-align:center; color:red; grid-column: 1/-1;'>Error al cargar el equipo: ${escaparHTML(error.message)}<br><small>¿Ya creaste la tabla 'equipo' en Supabase?</small></p>`;
+      return;
+    }
+
+    todoElEquipo = data || [];
+    renderizarEquipo();
+  } catch (err) {
+    lista.innerHTML = `<p style='text-align:center; color:red; grid-column: 1/-1;'>Error de conexión: ${escaparHTML(err.message)}</p>`;
+  }
+}
+
+// Renderizar las tarjetas de los miembros
+function renderizarEquipo() {
+  const lista = document.getElementById("lista-equipo");
+  lista.innerHTML = "";
+
+  if (todoElEquipo.length === 0) {
+    lista.innerHTML = "<p style='text-align:center; grid-column: 1/-1;'>Aún no hay miembros en el equipo.</p>";
+    return;
+  }
+
+  todoElEquipo.forEach(m => {
+    const card = document.createElement("div");
+    card.className = "producto-card";
+
+    const imagenHTML = m.foto
+      ? `<img src="${escaparHTML(m.foto)}" alt="${escaparHTML(m.nombre)}" class="producto-img">`
+      : `<div class="producto-img-placeholder">Sin Foto</div>`;
+
+    card.innerHTML = `
+      ${imagenHTML}
+      <div class="producto-info">
+        <div>
+          <span class="producto-cat-badge">${escaparHTML(m.funcion || "Sin función")}</span>
+          <h3 class="producto-titulo">${escaparHTML(m.nombre)}</h3>
+        </div>
+
+        <div class="producto-acciones">
+          <button type="button" class="btn-accion btn-editar btn-editar-miembro" data-id="${escaparHTML(m.id)}">✎ Editar</button>
+          <button type="button" class="btn-accion btn-eliminar btn-eliminar-miembro" data-id="${escaparHTML(m.id)}">Eliminar</button>
+        </div>
+      </div>
+    `;
+
+    lista.appendChild(card);
+  });
+}
+
+// Clics en los botones de las tarjetas del equipo
+document.getElementById("lista-equipo").addEventListener("click", (e) => {
+  const btnEliminar = e.target.closest(".btn-eliminar-miembro");
+  if (btnEliminar) {
+    abrirModalEliminarMiembro(btnEliminar.getAttribute("data-id"));
+    return;
+  }
+
+  const btnEditar = e.target.closest(".btn-editar-miembro");
+  if (btnEditar) {
+    abrirModalEditarMiembro(btnEditar.getAttribute("data-id"));
+  }
+});
+
+// --- AGREGAR MIEMBRO ---
+document.getElementById("form-miembro").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const form = e.target;
+  const btnGuardar = form.querySelector("button[type='submit']");
+  const textoOriginal = btnGuardar.innerText;
+  btnGuardar.innerText = "Guardando...";
+  btnGuardar.disabled = true;
+
+  try {
+    const fileInput = document.getElementById("m-foto");
+    let foto = null;
+    if (fileInput.files.length > 0) {
+      foto = await fotoABase64(fileInput.files[0]);
+    }
+
+    const nuevoMiembro = {
+      nombre: document.getElementById("m-nombre").value.trim(),
+      funcion: document.getElementById("m-funcion").value.trim(),
+      foto: foto
+    };
+
+    const { error } = await _supabase.from("equipo").insert([nuevoMiembro]);
+
+    if (error) {
+      alert("Error al guardar el miembro: " + error.message);
+    } else {
+      alert("Miembro agregado correctamente");
+      form.reset();
+      form.style.display = "none";
+      cargarEquipo();
+    }
+  } catch (err) {
+    alert("Error de red al agregar miembro: " + err.message);
+  } finally {
+    btnGuardar.innerText = textoOriginal;
+    btnGuardar.disabled = false;
+  }
+});
+
+// --- EDITAR MIEMBRO ---
+window.abrirModalEditarMiembro = function(id) {
+  const miembro = todoElEquipo.find(m => String(m.id) === String(id));
+  if (!miembro) {
+    alert("No se encontró el miembro para editar.");
+    return;
+  }
+
+  document.getElementById("edit-m-id").value = miembro.id;
+  document.getElementById("edit-m-nombre").value = miembro.nombre || "";
+  document.getElementById("edit-m-funcion").value = miembro.funcion || "";
+
+  const preview = document.getElementById("edit-m-foto-preview");
+  if (miembro.foto) {
+    preview.src = miembro.foto;
+    preview.style.display = "block";
+  } else {
+    preview.style.display = "none";
+  }
+
+  document.getElementById("edit-m-foto-file").value = "";
+  document.getElementById("modal-editar-miembro").style.display = "flex";
+};
+
+window.cerrarModalEditarMiembro = function() {
+  document.getElementById("modal-editar-miembro").style.display = "none";
+};
+
+document.getElementById("edit-m-foto-file").addEventListener("change", async (e) => {
+  if (e.target.files.length > 0) {
+    const preview = document.getElementById("edit-m-foto-preview");
+    preview.src = await fotoABase64(e.target.files[0]);
+    preview.style.display = "block";
+  }
+});
+
+document.getElementById("form-editar-miembro").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const btnGuardar = e.target.querySelector("button[type='submit']");
+  const textoOriginal = btnGuardar.innerText;
+  btnGuardar.innerText = "Guardando...";
+  btnGuardar.disabled = true;
+
+  try {
+    const id = document.getElementById("edit-m-id").value;
+    const datosActualizados = {
+      nombre: document.getElementById("edit-m-nombre").value.trim(),
+      funcion: document.getElementById("edit-m-funcion").value.trim()
+    };
+
+    const fileInput = document.getElementById("edit-m-foto-file");
+    if (fileInput.files.length > 0) {
+      datosActualizados.foto = await fotoABase64(fileInput.files[0]);
+    }
+
+    const idTarget = isNaN(id) ? id : Number(id);
+    const { error } = await _supabase
+      .from("equipo")
+      .update(datosActualizados)
+      .eq("id", idTarget);
+
+    if (error) {
+      alert("Error al actualizar el miembro: " + error.message);
+    } else {
+      const index = todoElEquipo.findIndex(m => String(m.id) === String(id));
+      if (index !== -1) {
+        todoElEquipo[index] = { ...todoElEquipo[index], ...datosActualizados };
+      }
+      alert("Miembro actualizado con éxito");
+      cerrarModalEditarMiembro();
+      renderizarEquipo();
+    }
+  } catch (err) {
+    alert("Error de red al editar: " + err.message);
+  } finally {
+    btnGuardar.innerText = textoOriginal;
+    btnGuardar.disabled = false;
+  }
+});
+
+// --- ELIMINAR MIEMBRO ---
+window.abrirModalEliminarMiembro = function(id) {
+  const miembro = todoElEquipo.find(m => String(m.id) === String(id));
+  if (!miembro) {
+    alert("No se encontró el miembro en la lista local.");
+    return;
+  }
+
+  idMiembroAEliminar = id;
+  document.getElementById("texto-confirmar-eliminar-miembro").innerHTML =
+    `¿Estás seguro de eliminar permanentemente a:<br><strong style="color:#4A3222; font-size:1.1rem;">"${escaparHTML(miembro.nombre)}"</strong>?<br><br><small style="color:#7C5136;">Esta acción no se puede deshacer.</small>`;
+
+  document.getElementById("modal-eliminar-miembro").style.display = "flex";
+};
+
+window.cerrarModalEliminarMiembro = function() {
+  document.getElementById("modal-eliminar-miembro").style.display = "none";
+  idMiembroAEliminar = null;
+};
+
+document.getElementById("btn-confirmar-eliminar-miembro").addEventListener("click", async () => {
+  if (!idMiembroAEliminar) return;
+
+  const btn = document.getElementById("btn-confirmar-eliminar-miembro");
+  btn.innerText = "Eliminando...";
+  btn.disabled = true;
+
+  const idBorrado = idMiembroAEliminar;
+
+  try {
+    const idTarget = isNaN(idBorrado) ? idBorrado : Number(idBorrado);
+    const { error } = await _supabase
+      .from("equipo")
+      .delete()
+      .eq("id", idTarget);
+
+    if (error) {
+      alert(`Error al eliminar de Supabase:\n${error.message}\n\n⚠️ Si el error dice 'permission denied', revisa los permisos RLS de la tabla 'equipo'.`);
+    } else {
+      alert("Miembro eliminado correctamente.");
+      todoElEquipo = todoElEquipo.filter(m => String(m.id) !== String(idBorrado));
+      renderizarEquipo();
+    }
+  } catch (err) {
+    alert("Error de conexión al eliminar: " + err.message);
+  } finally {
+    btn.innerText = "Sí, Eliminar";
+    btn.disabled = false;
+    cerrarModalEliminarMiembro();
+  }
+});
